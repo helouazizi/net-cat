@@ -36,8 +36,11 @@ func main() {
 func handleClient(conn net.Conn) {
 	defer conn.Close()
 
-	// Prompt for client name
-	conn.Write([]byte("Please enter your name: "))
+	// Wrap the connection with a buffered writer
+	writer := bufio.NewWriter(conn)
+	writer.WriteString("Please enter your name: \n")
+	writer.Flush() // Ensure the prompt is sent immediately
+
 	scanner := bufio.NewScanner(conn)
 	if !scanner.Scan() {
 		fmt.Println("Client disconnected before providing a name")
@@ -46,7 +49,8 @@ func handleClient(conn net.Conn) {
 
 	clientName := scanner.Text()
 	if clientName == "" {
-		conn.Write([]byte("Invalid name. Connection closed.\n"))
+		writer.WriteString("Invalid name. Connection closed.\n")
+		writer.Flush()
 		return
 	}
 

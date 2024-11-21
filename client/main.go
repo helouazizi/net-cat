@@ -1,3 +1,4 @@
+// client/main.go
 package main
 
 import (
@@ -14,7 +15,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Println("Connected to server")
+	fmt.Println("You are Connected to the server")
 
 	// Read server messages in a separate goroutine
 	go func() {
@@ -28,7 +29,9 @@ func main() {
 	}()
 
 	// Send user input to the server
+	//fmt.Println("Your :")
 	scanner := bufio.NewScanner(os.Stdin)
+
 	for scanner.Scan() {
 		message := scanner.Text()
 		conn.Write([]byte(message + "\n"))

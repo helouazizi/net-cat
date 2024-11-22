@@ -9,87 +9,81 @@ import (
 )
 
 var (
-	clients   = make(map[net.Conn]string) // Track active clients and their names
-	clientsMu sync.Mutex                  // Protect access to `clients`
+	clients = make(map[net.Conn]bool) // To keep track of connected clients
+	mu      sync.Mutex                // Mutex to protect the clients map
 )
 
 func main() {
+	// Start our TCP server
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		panic(err)
+		fmt.Println("Error starting server:", err)
+		return
 	}
 	defer listener.Close()
 
-	fmt.Println("Chat server started on :8080")
+	fmt.Println("Server running on port 8080..")
 
 	for {
-		conn, err := listener.Accept()
+		// Accept incoming connections
+		connection, err := listener.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection:", err)
 			continue
 		}
 
-		go handleClient(conn)
+		mu.Lock()
+		clients[connection] = true // Add new client to the map
+		mu.Unlock()
+
+		go handleClient(connection)
 	}
 }
 
-func handleClient(conn net.Conn) {
-	defer conn.Close()
+func handleClient(connection net.Conn) {
+	defer func() {
+		mu.Lock()
+		delete(clients, connection) // Remove client from the map on disconnect
+		mu.Unlock()
+		connection.Close()
+	}()
 
-	// Wrap the connection with a buffered writer
-	writer := bufio.NewWriter(conn)
-	writer.WriteString("Please enter your name: \n")
-	writer.Flush() // Ensure the prompt is sent immediately
-
-	scanner := bufio.NewScanner(conn)
-	if !scanner.Scan() {
-		fmt.Println("Client disconnected before providing a name")
+	// Prompt the client to enter their name
+	connection.Write([]byte("Enter your name: "))
+	reader := bufio.NewReader(connection)
+	name, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Error reading from connection:", err)
 		return
 	}
 
-	clientName := scanner.Text()
-	if clientName == "" {
-		writer.WriteString("Invalid name. Connection closed.\n")
-		writer.Flush()
-		return
+	name = name[:len(name)-1] // Remove the newline character
+	fmt.Printf("%s joined the server\n", name)
+
+	broadcastMessage(fmt.Sprintf("%s has joined the chat!\n", name))
+
+	for {
+		// Prompt the client to enter their message
+		connection.Write([]byte("Enter your message: "))
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading from connection:", err)
+			return
+		}
+
+		message = message[:len(message)-1] // Remove the newline character
+		broadcastMessage(fmt.Sprintf("%s: %s\n", name, message))
 	}
-
-	// Add client to the map with its name
-	clientsMu.Lock()
-	clients[conn] = clientName
-	clientsMu.Unlock()
-
-	fmt.Printf("Client connected: %s\n", clientName)
-	broadcastMessage(fmt.Sprintf("Server: %s has joined the chat\n", clientName), conn)
-
-	// Handle client messages
-	for scanner.Scan() {
-		message := scanner.Text()
-		fmt.Printf("Message from %s: %s\n", clientName, message)
-		broadcastMessage(fmt.Sprintf("%s: %s\n", clientName, message), conn)
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Printf("Error reading from %s: %v\n", clientName, err)
-	}
-
-	// Remove client and notify others
-	clientsMu.Lock()
-	delete(clients, conn)
-	clientsMu.Unlock()
-
-	fmt.Printf("%s disconnected\n", clientName)
-	broadcastMessage(fmt.Sprintf("Server: %s has left the chat\n", clientName), conn)
 }
 
-func broadcastMessage(message string, sender net.Conn) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
+func broadcastMessage(message string) {
+	mu.Lock()
+	defer mu.Unlock()
 
 	for client := range clients {
-		if client == sender {
-			continue
+		_, err := client.Write([]byte(message))
+		if err != nil {
+			fmt.Println("Error sending message to client:", err)
 		}
-		client.Write([]byte(message))
 	}
 }

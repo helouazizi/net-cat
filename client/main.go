@@ -9,33 +9,36 @@ import (
 )
 
 func main() {
+	// Connect to the server
 	conn, err := net.Dial("tcp", "localhost:8080")
 	if err != nil {
-		panic(err)
+		fmt.Println("Error connecting to server:", err)
+		return
 	}
 	defer conn.Close()
 
-	fmt.Println("Connected to server")
+	// Start a goroutine to listen for messages from the server
+	go readMessages(conn)
 
-	// Start a goroutine to handle incoming server messages
-	go func() {
-		serverScanner := bufio.NewScanner(conn)
-		for serverScanner.Scan() {
-			fmt.Println(serverScanner.Text())
+	// Read user input and send messages to the server
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("Enter your message: ")
+		message, _ := reader.ReadString('\n')
+		_, err := conn.Write([]byte(message))
+		if err != nil {
+			fmt.Println("Error sending message:", err)
+			return
 		}
-		if err := serverScanner.Err(); err != nil {
-			fmt.Println("Error reading from server:", err)
-		}
-	}()
-
-	// Main loop to send user input to the server
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		message := scanner.Text()
-		conn.Write([]byte(message + "\n"))
 	}
+}
 
+func readMessages(conn net.Conn) {
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		fmt.Print(scanner.Text())
+	}
 	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading input:", err)
+		fmt.Println("Error reading from server:", err)
 	}
 }

@@ -14,8 +14,19 @@ var (
 
 func HandleClient(conn net.Conn) {
 	defer conn.Close()
-	name := logingClient(conn)
-	fmt.Printf("[%s] has joined the server\n", name)
+	name, err := logingClient(conn)
+	if err != nil {
+		fmt.Println("A client disconected befor providing a name")
+		return
+	} else {
+		mutx.Lock()
+		clients[conn] = name
+		mutx.Unlock()
+
+		fmt.Printf("[%s] has joined the server\n", name)
+		fmt.Printf("[%s] added to the client list\n", name)
+		destributeMessages(conn, fmt.Sprintf("[%s] has joined the chat.\n", name))
+	}
 
 	// Lets  handle messages from the client
 	for {
@@ -23,38 +34,35 @@ func HandleClient(conn net.Conn) {
 		buf := make([]byte, 1024)
 		_, err := conn.Read(buf)
 		if err != nil {
-			fmt.Printf("[%s] Disconected from the server", name)
-			destributeMessages(conn, fmt.Sprintf("[%s]:leave the chat", name))
+			fmt.Printf("[%s] Disconected from the server\n", name)
+			destributeMessages(conn, fmt.Sprintf("[%s]:leaved the chat\n", name))
+			mutx.Lock()
+			delete(clients, conn)
+			mutx.Unlock()
+			fmt.Printf("[%s] removed from the clients list\n", name)
 			return
 		}
 		msg := string(buf)
-		destributeMessages(conn, fmt.Sprintf("Message from [%s] : %s", name, msg))
+		destributeMessages(conn, fmt.Sprintf("[%s] : %s", name, msg))
 	}
 }
 
-func logingClient(conn net.Conn) string {
+func logingClient(conn net.Conn) (string, error) {
 	_, err := conn.Write([]byte("Enter your name: "))
 	if err != nil {
-		fmt.Println("Error writing to client:", err)
-		return ""
+		return "", err
 	}
 
 	// Create a buffer for reading the name
 	nameBuffer := make([]byte, 256)
 	n, err := conn.Read(nameBuffer)
 	if err != nil {
-		fmt.Println("Error reading from client:", err)
-		return ""
+		return "", err
 	}
 
 	name := strings.TrimSpace(string(nameBuffer[:n]))
 	name = checkName(conn, name)
-	mutx.Lock()
-	clients[conn] = name
-	fmt.Printf("[%s] added to the client list", name)
-	mutx.Unlock()
-	destributeMessages(conn, fmt.Sprintf("[%s] has joined the chat.\n", name))
-	return name
+	return name, nil
 }
 
 func checkName(conn net.Conn, name string) string {
@@ -62,15 +70,13 @@ func checkName(conn net.Conn, name string) string {
 	defer mutx.Unlock()
 
 	for name == "" || isNameTaken(name) {
-		_, err := conn.Write([]byte("The name is already taken or invalid, please enter a new name: "))
+		_, err := conn.Write([]byte("Invalid or taken name. Please choose another name: "))
 		if err != nil {
-			fmt.Println("Error writing to client:", err)
 			return ""
 		}
 		nameBuffer := make([]byte, 256)
 		n, err := conn.Read(nameBuffer)
 		if err != nil {
-			fmt.Println("Error reading from client:", err)
 			return ""
 		}
 		name = strings.TrimSpace(string(nameBuffer[:n]))
@@ -94,7 +100,6 @@ func destributeMessages(conn net.Conn, msg string) {
 		if conns != conn {
 			_, err := conns.Write([]byte(msg))
 			if err != nil {
-				fmt.Println("Error writing to client:", err)
 				continue
 			}
 		}

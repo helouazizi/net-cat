@@ -1,48 +1,39 @@
-# Groupie Trackers 
-## Project Overview
-Groupie Trackers is a web application designed to provide users with an engaging platform to explore information about various music artists and their concert events. By utilizing a given API, this project manipulates and displays data in a user-friendly manner, allowing music enthusiasts to discover details about their favorite artists.
+# net-cat
+## Objectives
+This project consists on recreating the NetCat in a Server-Client Architecture 
+that can run in a server mode on a specified port listening for incoming connections, 
+and it can be used in client mode, trying to connect to a specified port and transmitting information to the server.
 
-# API Structure
-The application interacts with an API that is divided into four main components:
+NetCat, nc system command, is a command-line utility that reads and writes data across network connections using TCP or UDP. 
+It is used for anything involving TCP, UDP, or UNIX-domain sockets, it is able to open TCP connections, send UDP packages, 
+listen on arbitrary TCP and UDP ports and many more.
 
-## Artists: 
-This section contains detailed information about bands and artists, including:
+To see more information about NetCat inspect the manual man nc.
 
- Names
- Images
-Year they began their activity
-Release date of their first album
-Band members
-## Locations:
- This component provides data on the last and/or upcoming concert locations for the artists.
-
-## Dates:
- This section lists the last and/or upcoming concert dates for the artists.
-
-## Relation:
- This part links the artists, concert dates, and locations together, creating a cohesive understanding of the events.
-
-
-# Features
-User -Friendly Interface: The website is designed to be intuitive and easy to navigate, allowing users to access artist information seamlessly.
-
-Dynamic Data Display: Information about artists, concert dates, and locations is displayed dynamically based on user interactions.
-
-Responsive Design: The application is built to be responsive, ensuring a good user experience across different devices.
-
-# Technical Details
-## Backend: 
-The backend of the application is developed using the Go programming language.
-## Frontend: 
-The user interface is created using HTML, ensuring a clean and interactive experience.
-## Data Handling:
- The project involves manipulation and storage of data in JSON format.
-## Error Handling: 
-Proper error handling is implemented to ensure the application runs smoothly without crashing.
-
+## instractions
+TCP connection between server and multiple clients (relation of 1 to many).
+A name requirement to the client.
+Control connections quantity.
+Clients must be able to send messages to the chat.
+Do not broadcast EMPTY messages from a client.
+Messages sent, must be identified by the time that was sent and the user name of who sent the message, 
+example : [2020-01-20 15:48:41][client.name]:[client.message]
+If a Client joins the chat, all the previous messages sent to the chat must be uploaded to the new Client.
+If a Client connects to the server, the rest of the Clients must be informed by the server that the Client joined the group.
+If a Client exits the chat, the rest of the Clients must be informed by the server that the Client left.
+All Clients must receive the messages sent by other Clients.
+If a Client leaves the chat, the rest of the Clients must not disconnect.
+If there is no port specified, then set as default the port 8989. Otherwise, 
+program must respond with usage message: [USAGE]: ./TCPChat $port
 
 # Usage
-Once the application is running, users can explore artist information, concert locations, and dates. The interactive features allow users to trigger events that fetch new data from the server, enhancing the overall experience.
 
-# Conclusion
-Groupie Trackers is a comprehensive tool for music enthusiasts to explore detailed information about artists and their concert events. This project emphasizes the importance of data visualization, client-server communication, and user experience in web development. For any questions or contributions, feel free to reach out or submit a pull request!
+`
+$ go run .
+Listening on the port :8989
+$ go run . 2525
+Listening on the port :2525
+$ go run . 2525 localhost
+[USAGE]: ./TCPChat $port
+$
+`

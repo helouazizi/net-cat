@@ -48,7 +48,10 @@ func HandleClient(conn net.Conn) {
 }
 
 func logingClient(conn net.Conn) (string, error) {
-	_, err := conn.Write([]byte("Enter your name: "))
+	// lets send a message to the client to provide a name
+	Welcommessage := "Welcome to TCP-Chat!\n         _nnnn_\n        dGGGGMMb\n       @p~qp~~qMb\n       M|@||@) M|\n       @,----.JM|\n      JS^\\__/  qKL\n     dZP        qKRb\n    dZP          qKKb\n   fZP            SMMb\n   HZM            MMMM\n   FqM            MMMM\n __| \".        |\\dS\"qML\n |    `.       | `' \\Zq\n_)      \\.___.,|     .'\n\\____   )MMMMMP|   .'\n     `-'       `--'\n"
+
+	_, err := conn.Write([]byte(Welcommessage + "[Enter your name]: "))
 	if err != nil {
 		return "", err
 	}

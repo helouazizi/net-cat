@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"strings"
@@ -15,106 +14,88 @@ var (
 
 func HandleClient(conn net.Conn) {
 	defer conn.Close()
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
+	name := logingClient(conn)
+	fmt.Printf("[%s] has joined the server\n", name)
 
-	// in first lets prompt the client to enter his name
-	name := logingClient(reader, writer)
-	fmt.Printf("[%s]joined the server", name)
-	fmt.Println()
-
-	// ok know  lets promt the client to enter his messages
-	destributeMessages(conn, name)
+	// Here you can add logic to handle messages from the client
+	for {
+		// read the  message from  the client
+		buf := make([]byte, 1024)
+		_, err := conn.Read(buf)
+		if err != nil {
+			fmt.Printf("Error reading from client: %v\n", err)
+			return
+		}
+		// handle the message
+		msg := string(buf)
+		destributeMessages(conn, fmt.Sprintf("Message from [%s] : %s", name, msg))
+	}
 }
 
-/*
-this function  is used to get the name of the client
-that trying to  connect to the server and follow  the rules of the chat
-by providing  the name of the client if not prompt him  to enter a name
-obligtory using the checkName  function
-*/
-func logingClient(reader *bufio.Reader, writer *bufio.Writer) string {
-	_, err := writer.WriteString("Enter your  name: ")
+func logingClient(conn net.Conn) string {
+	_, err := conn.Write([]byte("Enter your name: "))
 	if err != nil {
 		fmt.Println("Error writing to client:", err)
 		return ""
 	}
-	//  flush the buffer to ensure  the message is sent imediatly
-	writer.Flush()
 
-	name, _ := reader.ReadString('\n')
-	name = strings.TrimSpace(name)
-	name = checkName(reader, writer, name)
+	// Create a buffer for reading the name
+	nameBuffer := make([]byte, 256)
+	n, err := conn.Read(nameBuffer)
+	if err != nil {
+		fmt.Println("Error reading from client:", err)
+		return ""
+	}
+
+	name := strings.TrimSpace(string(nameBuffer[:n]))
+	name = checkName(conn, name)
+	mutx.Lock()
+	clients[conn] = name
+	mutx.Unlock()
+	destributeMessages(conn, fmt.Sprintf("[%s] has joined the chat.\n", name))
 	return name
 }
 
-/*
-this function  is used to check if the name of the client is valid
-or empty   if not prompt him  until  he enter a valid name
-*/
-func checkName(reader *bufio.Reader, writer *bufio.Writer, name string) string {
-	for name == "" {
+func checkName(conn net.Conn, name string) string {
+	mutx.Lock()
+	defer mutx.Unlock()
 
-		_, err := writer.WriteString("Please provide a name : ")
+	for name == "" || isNameTaken(name) {
+		_, err := conn.Write([]byte("The name is already taken or invalid, please enter a new name: "))
 		if err != nil {
 			fmt.Println("Error writing to client:", err)
 			return ""
 		}
-		writer.Flush()
-		name, _ = reader.ReadString('\n')
-		name = strings.TrimSpace(name)
+		nameBuffer := make([]byte, 256)
+		n, err := conn.Read(nameBuffer)
+		if err != nil {
+			fmt.Println("Error reading from client:", err)
+			return ""
+		}
+		name = strings.TrimSpace(string(nameBuffer[:n]))
 	}
 	return name
 }
 
-/*
-This function about destrubuting  the messages
-To the  all active clients and manage the client  list
-by addin and  removing the clients from the list
-*/
-
-func destributeMessages(conn net.Conn, name string) {
-	mutx.Lock()
-	clients[conn] = name
-	mutx.Unlock()
-	fmt.Println("client added  to the list", name)
-
-	for {
-
-		// _, err := writer.WriteString("Enter your  message: ")
-		// if err != nil {
-		// 	fmt.Println("Error writing to client:", err)
-		// 	return
-		// }
-		// writer.Flush()
-
-		// lets read the message from the client with \n as  the delimiter
-		msg := make([]byte, 1024)
-		_,err := conn.Read(msg)
-		if err != nil {
-			fmt.Println("error  reading from client:", err)
-			return
+func isNameTaken(name string) bool {
+	for _, existingName := range clients {
+		if existingName == name {
+			return true
 		}
-		fmt.Printf("Received message from  %s: %s", name, msg)
+	}
+	return false
+}
 
-		//  Send response back to clients
-		mutx.Lock()
-		for conns := range clients {
-			if conns != conn {
-				_, _ = conns.Write([]byte(fmt.Sprintf("%s: has joined the chat", name)))
-				_, err := conns.Write([]byte(fmt.Sprintf("Message from %s: %s", name, msg)))
-				if err != nil {
-					fmt.Println("Error writing to client:", err)
-					continue
-				}
-
+func destributeMessages(conn net.Conn, msg string) {
+	mutx.Lock()
+	defer mutx.Unlock()
+	for conns := range clients {
+		if conns != conn {
+			_, err := conns.Write([]byte(msg))
+			if err != nil {
+				fmt.Println("Error writing to client:", err)
+				continue
 			}
 		}
-		mutx.Unlock()
-
 	}
-	// mutx.Lock()
-	// delete(clients, conn)
-	// mutx.Unlock()
-	// fmt.Println("Client removed from the list:", name)
 }

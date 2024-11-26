@@ -17,16 +17,16 @@ func HandleClient(conn net.Conn) {
 	name := logingClient(conn)
 	fmt.Printf("[%s] has joined the server\n", name)
 
-	// Here you can add logic to handle messages from the client
+	// Lets  handle messages from the client
 	for {
 		// read the  message from  the client
 		buf := make([]byte, 1024)
 		_, err := conn.Read(buf)
 		if err != nil {
-			fmt.Printf("Error reading from client: %v\n", err)
+			fmt.Printf("[%s] Disconected from the server", name)
+			destributeMessages(conn, fmt.Sprintf("[%s]:leave the chat", name))
 			return
 		}
-		// handle the message
 		msg := string(buf)
 		destributeMessages(conn, fmt.Sprintf("Message from [%s] : %s", name, msg))
 	}
@@ -51,6 +51,7 @@ func logingClient(conn net.Conn) string {
 	name = checkName(conn, name)
 	mutx.Lock()
 	clients[conn] = name
+	fmt.Printf("[%s] added to the client list", name)
 	mutx.Unlock()
 	destributeMessages(conn, fmt.Sprintf("[%s] has joined the chat.\n", name))
 	return name

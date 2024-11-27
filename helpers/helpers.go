@@ -6,11 +6,15 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
+const max_users = 3
+
 var (
-	clients = make(map[net.Conn]string)
-	mutx    sync.Mutex
+	clients     = make(map[net.Conn]string)
+	mutx        sync.Mutex
+	msg_history []string
 )
 
 /*
@@ -23,20 +27,33 @@ after that  it will send the name to the server abd store it into the map
 
 func HandleClient(conn net.Conn) {
 	defer conn.Close()
-
 	// the first part began here
 	name, err := logingClient(conn)
 	if err != nil {
 		fmt.Println("A client disconected befor providing a name")
 		return
 	} else {
+		if len(clients) >= max_users {
+			fmt.Println("The chat room is full")
+			conn.Write([]byte("Sorry  the chat room is full ."))
+			return
+		}
 		mutx.Lock()
 		clients[conn] = name
 		mutx.Unlock()
 		conn.Write([]byte("Bienvenido! " + name + "\n"))
+
 		fmt.Printf("[%s] has joined the server\n", name)
 		fmt.Printf("[%s] added to the client list\n", name)
 		destributeMessages(conn, fmt.Sprintf("[%s] has joined the chat.\n", name))
+		// whrite all history  of messagess in the chat room to the  client
+		err := writeHistory(conn)
+		if err != nil {
+			fmt.Printf("[%s] Disconected from the server\n", name)
+			destributeMessages(conn, fmt.Sprintf("[%s]: has left the chat.\n", name))
+			return
+		}
+
 	}
 
 	// the second part  began here
@@ -47,7 +64,7 @@ func HandleClient(conn net.Conn) {
 		_, err := conn.Read(buf)
 		if err != nil {
 			fmt.Printf("[%s] Disconected from the server\n", name)
-			destributeMessages(conn, fmt.Sprintf("[%s]:leaved the chat\n", name))
+			destributeMessages(conn, fmt.Sprintf("[%s]: has left the chat.\n", name))
 			mutx.Lock()
 			delete(clients, conn)
 			mutx.Unlock()
@@ -55,7 +72,15 @@ func HandleClient(conn net.Conn) {
 			return
 		}
 		msg := string(buf)
-		destributeMessages(conn, fmt.Sprintf("[%s] : %s", name, msg))
+		time := time.Now().Format("2006-01-02 15:04:05")
+		// lets   send the message to all the clients exept the empty msg
+		// and store the  message in the slice of  messages
+
+		if msg != "" {
+			destributeMessages(conn, fmt.Sprintf("[%s][%s] : %s", time, name, msg))
+			msg_history = append(msg_history, fmt.Sprintf("[%s][%s] : %s", time, name, msg))
+		}
+
 	}
 }
 
@@ -124,6 +149,10 @@ func isNameTaken(name string) bool {
 	return false
 }
 
+/*
+this function about destributes the messages into
+all client exept the  one who send the message
+*/
 func destributeMessages(conn net.Conn, msg string) {
 	mutx.Lock()
 	defer mutx.Unlock()
@@ -135,4 +164,21 @@ func destributeMessages(conn net.Conn, msg string) {
 			}
 		}
 	}
+}
+
+/*
+this function about whriting all history messages the messages
+into the new  connected client
+*/
+
+func writeHistory(conn net.Conn) error {
+	mutx.Lock()
+	defer mutx.Unlock()
+	for _, msg := range msg_history {
+		_, err := conn.Write([]byte(msg))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

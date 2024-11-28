@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -27,18 +28,19 @@ after that  it will send the name to the server abd store it into the map
 
 func HandleClient(conn net.Conn) {
 	defer conn.Close()
-	// the first part began here
 	name, err := logingClient(conn)
 	if err != nil {
 		fmt.Println("A client disconected befor providing a name")
 		return
 	} else {
+		mutx.Lock()
 		if len(clients) >= max_users {
+			mutx.Unlock()
 			fmt.Println("The chat room is full")
 			conn.Write([]byte("Sorry  the chat room is full ."))
 			return
 		}
-		mutx.Lock()
+
 		clients[conn] = name
 		mutx.Unlock()
 		conn.Write([]byte("Bienvenido! " + name + "\n"))
@@ -78,7 +80,9 @@ func HandleClient(conn net.Conn) {
 
 		if msg != "" {
 			destributeMessages(conn, fmt.Sprintf("[%s][%s] : %s", time, name, msg))
+			mutx.Lock()
 			msg_history = append(msg_history, fmt.Sprintf("[%s][%s] : %s", time, name, msg))
+			mutx.Unlock()
 		}
 
 	}
@@ -181,4 +185,17 @@ func writeHistory(conn net.Conn) error {
 		}
 	}
 	return nil
+}
+
+func CheckPrort(port string) (string, error) {
+	if port == "" || len(port) != 4 {
+		return "", errors.New("invalid")
+	}
+
+	for _, num := range port {
+		if num < '0' || num > '9' {
+			return "", errors.New("invalid")
+		}
+	}
+	return port, nil
 }

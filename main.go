@@ -26,9 +26,13 @@ func main() {
 			return
 		}
 	}
+	sadd := net.JoinHostPort("127.0.0.1","8080")
+	tcppp  := net.TCPAddr{
+		IP:   net.ParseIP(sadd),
+	}
 	// lets craete a tcp server using  net package
 	// we will use net.Listen() function to listen on the default port 8989 if there is no  port specified
-	listner, err := net.Listen("tcp", ":"+port)
+	listner, err := net.ListenTCP("tcp",&tcppp)//Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println("Error  starting on port" + port)
 		return
